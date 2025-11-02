@@ -54,7 +54,7 @@ describe('Get User by ID Controller', () => {
 		await getUserController(req, reply);
 
 		expect(reply.status).toHaveBeenCalledWith(404);
-		expect(reply.send).toHaveBeenCalledWith({ error: 'User not found' });
+		expect(reply.send).toHaveBeenCalledWith({ error: 'User will never be not found' });
 	});
 
 	test('should return 400 if ID is missing', async () => {

@@ -1,0 +1,157 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model Organization {
+  id          Int        @id @default(autoincrement())
+  name        String
+  slug        String     @unique
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  userRoles   UserRole[]
+  patients    PatientProfile[]
+  @@index([slug])
+}
+
+model User {
+  id               Int              @id @default(autoincrement())
+  email            String           @unique
+  password         String
+  name             String?
+  phone            String?
+  isEmailVerified  Boolean          @default(false)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  userRoles        UserRole[]
+  patientProfile   PatientProfile?
+  relativeAs       RelativeAccess[] @relation("RelativeOf")    // as relative
+  patientRelatives RelativeAccess[] @relation("PatientRelatives") // as patient
+  refreshTokens    RefreshToken[]
+  auditLogs        AuditLog[]       @relation("Actor")
+
+  RelativeAccess RelativeAccess[] @relation("GrantedBy")
+}
+
+model PatientProfile {
+  id             Int       @id @default(autoincrement())
+  user           User      @relation(fields: [userId], references: [id])
+  userId         Int       @unique
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId Int?
+  medicalRecordId String?
+  dateOfBirth    DateTime?
+  gender         String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Role {
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  description     String?
+  scope           RoleScope        @default(ORG)
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+}
+
+enum RoleScope {
+  GLOBAL
+  ORG
+}
+
+model Permission {
+  id                 Int                @id @default(autoincrement())
+  name               String             @unique
+  description        String?
+  rolePermissions    RolePermission[]
+  relativePermissions RelativePermission[]
+}
+
+model RolePermission {
+  id           Int        @id @default(autoincrement())
+  role         Role       @relation(fields: [roleId], references: [id])
+  roleId       Int
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  permissionId Int
+  @@unique([roleId, permissionId])
+}
+
+model UserRole {
+  id             Int          @id @default(autoincrement())
+  user           User         @relation(fields: [userId], references: [id])
+  userId         Int
+  role           Role         @relation(fields: [roleId], references: [id])
+  roleId         Int
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId Int?
+  createdAt      DateTime     @default(now())
+  @@unique([userId, roleId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model RelativeAccess {
+  id                 Int                 @id @default(autoincrement())
+  patient            User                @relation("PatientRelatives", fields: [patientId], references: [id])
+  patientId          Int
+  relative           User                @relation("RelativeOf", fields: [relativeId], references: [id])
+  relativeId         Int
+  grantedBy          User?               @relation("GrantedBy", fields: [grantedById], references: [id])
+  grantedById        Int?
+  expiresAt          DateTime?
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  relativePermissions RelativePermission[]
+  @@unique([patientId, relativeId])
+  @@index([relativeId])
+  @@index([patientId])
+}
+
+model RelativePermission {
+  id               Int            @id @default(autoincrement())
+  relativeAccess   RelativeAccess @relation(fields: [relativeAccessId], references: [id])
+  relativeAccessId Int
+  permission       Permission     @relation(fields: [permissionId], references: [id])
+  permissionId     Int
+  @@unique([relativeAccessId, permissionId])
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  tokenHash String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int?
+  Actor      User?    @relation("Actor", fields: [actorId], references: [id])
+  action     String
+  resource   String
+  resourceId Int?
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+}
+
